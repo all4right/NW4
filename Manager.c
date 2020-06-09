@@ -4,6 +4,14 @@
 
 #define BUFSIZE 1500
 
+typedef struct MIB {
+	int	    tot_capured_pk_num; //총 비트 수
+	int	    numpkt_per_sec, numbyte_per_sec; //비트율
+	unsigned long	net_ip_count;
+	unsigned long	trans_tcp_count;
+	unsigned long	trans_udp_count;
+} MIB;
+
 // 소켓 함수 오류 출력 후 종료
 void err_quit(char *msg)
 {
@@ -25,7 +33,9 @@ int main(int argc, char* argv[])
     strcpy(addr2,"127.0.0.1");
 	while(1){
         SNMPrequest(addr1);
+		sleep(1);
         SNMPrequest(addr2);
+		sleep(1);
     }
 }
 
@@ -35,6 +45,8 @@ void SNMPrequest(char* address){
 	SOCKADDR_IN serveraddr;
 	char buf[BUFSIZE+1];
 	int len;
+
+	MIB *response = (MIB*)malloc(sizeof(MIB));
 
 	// 윈속 초기화
 	WSADATA wsa;
@@ -56,12 +68,40 @@ void SNMPrequest(char* address){
 	if(retval == SOCKET_ERROR) err_quit("connect()");
 		
 	// 서버와 데이터 통신
-	while(1){
-		// 데이터 입력
-		ZeroMemory(buf, sizeof(buf));
-		
 
+	ZeroMemory(buf, sizeof(buf));
+
+	printf("\nseveraddr: %s Request ");
+		
+	strcpy(buf,"request");
+
+	// '\n' 문자 제거
+	len = strlen(buf);
+	if(buf[len-1] == '\n')
+		buf[len-1] = '\0';
+
+	// request 보내기
+	retval = send(sock, buf, strlen(buf), 0);
+	if(retval == SOCKET_ERROR){
+		err_display("send()");
+		return;
 	}
+
+	// 데이터 받기
+	retval = recv(sock, buf, BUFSIZE, 0);
+	if(retval == SOCKET_ERROR){
+		err_display("recv()");
+		return;
+	}
+	else if(retval == 0)
+		return;
+		
+	// 받은 데이터 출력
+	buf[retval] = '\0';
+	response = (MIB*)buf;
+
+	printf("Total pkt:%d pktper:%d byteper:%d ip:%lu tcp:%lu udp:%lu \n"
+	, response->tot_capured_pk_num, response->numpkt_per_sec, response->numbyte_per_sec, response->net_ip_count, response->trans_tcp_count, response->trans_udp_count);
 
 	// closesocket()
 	closesocket(sock);

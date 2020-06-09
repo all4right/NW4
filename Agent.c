@@ -25,6 +25,16 @@
 
 #define LINE_LEN 16
 
+typedef struct MIB {
+	int	    tot_capured_pk_num; //총 비트 수
+	int	    numpkt_per_sec, numbyte_per_sec; //비트율
+	unsigned long	net_ip_count; //ip
+	unsigned long	trans_tcp_count; //tcp
+	unsigned long	trans_udp_count; //udp
+} MIB;
+
+MIB *response;
+
  // litereals realted to distinguishing protocols
 #define ETHERTYPE_IP		0x0800
 #define ETH_II_HSIZE		14		// frame size of ethernet v2
@@ -92,7 +102,6 @@ int main()
 	int		retval, msglen;
 
     //for packet capture
-    
     pcap_t*             adhandle;
     pcap_if_t*          alldevs;
     pcap_if_t*          d;
@@ -147,7 +156,16 @@ int main()
 		// 클라이언트와 데이터 통신
 		while(1){
 
-            //printf("default device: %s\n", pcap_lookupdev(errbuf));
+            // 데이터 받기
+			msglen = recv(client_sock, buf, BUFSIZE, 0);
+			if(msglen == SOCKET_ERROR){
+				err_display("recv()");
+				break;
+			}
+			else if(msglen == 0)
+				break;
+
+            response = (MIB*)malloc(sizeof(MIB));
 
             /* Retrieve the device list */
             if (pcap_findalldevs(&alldevs, errbuf) == -1)
@@ -195,57 +213,53 @@ int main()
                 return -1;
             }
 
-            /* select device for online packet capture application */
-            printf(" Enter the interface number (1-%d):", ndNum);
-            scanf("%d", &devNum);
+            for(devNum = 0; devNum < ndNum; devNum++){
+                /* Open the adapter */
+                if ((adhandle = pcap_open_live( d->name, // name of the device
+                                                65536,     // portion of the packet to capture. 
+                                                            // 65536 grants that the whole packet will be captured on all the MACs.
+                                                1,         // promiscuous mode
+                                                1000,      // read timeout
+                                                errbuf)     // error buffer
+                    ) == NULL)
+                {
+                    fprintf(stderr, "\nUnable to open the adapter. %s is not supported by Npcap\n", d->name);
+                    /* Free the device list */
+                    pcap_freealldevs(alldevs);
+                    return -1;
+                }
 
-            /* select error ? */
-            if (devNum < 1 || devNum > ndNum)
-            {
-                printf("\nInterface number out of range.\n");
-                /* Free the device list */
-                pcap_freealldevs(alldevs);
-                return -1;
-            }
+                printf("\n Selected device %s is available\n\n", d->description);
 
-            /* Jump to the selected adapter */
-            for (d = alldevs, i = 0; i < devNum - 1; d = d->next, i++);
-
-            /* Open the adapter */
-            if ((adhandle = pcap_open_live( d->name, // name of the device
-                                            65536,     // portion of the packet to capture. 
-                                                        // 65536 grants that the whole packet will be captured on all the MACs.
-                                            1,         // promiscuous mode
-                                            1000,      // read timeout
-                                            errbuf)     // error buffer
-                ) == NULL)
-            {
-                fprintf(stderr, "\nUnable to open the adapter. %s is not supported by Npcap\n", d->name);
-                /* Free the device list */
-                pcap_freealldevs(alldevs);
-                return -1;
-            }
-
-            printf("\n Selected device %s is available\n\n", d->description);
-            pcap_freealldevs(alldevs);
-
-            // start the capture
-            numpkt_per_sec = numbyte_per_sec = net_ip_count = trans_tcp_count = trans_udp_count = 0;
-
-            pcap_loop(adhandle, 	// capture device handler
+                pcap_loop(adhandle, 	// capture device handler
                         -1, 	   	// forever
                         get_stat,   // callback function
                         NULL);      // no arguments
 
+                // device 넘기기
+                d = d->next;
+            }
+
+            //response에 정보를 저장
+            response->tot_capured_pk_num = tot_capured_pk_num;
+            response->numpkt_per_sec = numpkt_per_sec;
+            response->numbyte_per_sec = numbyte_per_sec;
+            response->net_ip_count = net_ip_count;
+            response->trans_tcp_count = trans_tcp_count;
+            response->trans_udp_count = trans_udp_count;
+
+            //response 보내기
+            buf = (char*)response;
+            retval = send(client_sock, buf, strlen(response), 0); 
+            
+            pcap_freealldevs(alldevs);
+
+            // initialize MIB
+            tot_capured_pk_num=numpkt_per_sec = numbyte_per_sec = net_ip_count = trans_tcp_count = trans_udp_count = 0;
+            free(response);
 
             /* Close the handle */
             pcap_close(adhandle);
-
-            /* At this point, we don't need any more the device list. Free it */
-
-			/*TODO 
-            request 받고 response 송신설정
-            */
 
 			if(retval == SOCKET_ERROR){
 				err_display("send()");
@@ -316,6 +330,8 @@ void get_stat(u_char* user, const struct pcap_pkthdr* h,    const u_char* p)
 
     if (tot_capured_pk_num++ > MAX_CAP_PKT) {
         printf("\n\n %d-packets were captured ...\n", tot_capured_pk_num);
+
+        response;
 
         // close all devices and files
         pcap_close(adhandle);
