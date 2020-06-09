@@ -1,6 +1,15 @@
+#ifdef _MSC_VER
+/*
+ * we do not want the warnings about the old deprecated and unsecure CRT functions
+ * since these examples can be compiled under *nix as well
+ */
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <winsock2.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #define BUFSIZE 1500
 
@@ -25,6 +34,8 @@ void err_display(char *msg)
 	printf("socket function error [%s]\n", msg);
 }
 
+int SNMPrequest(char*);
+
 int main(int argc, char* argv[])
 {
     char addr1[100];
@@ -33,13 +44,14 @@ int main(int argc, char* argv[])
     strcpy(addr2,"127.0.0.1");
 	while(1){
         SNMPrequest(addr1);
-		sleep(1);
+		Sleep(100);
         SNMPrequest(addr2);
-		sleep(1);
+		Sleep(100);
     }
+	return 0;
 }
 
-void SNMPrequest(char* address){
+int SNMPrequest(char* address){
     int retval;
 	SOCKET sock;
 	SOCKADDR_IN serveraddr;
@@ -61,17 +73,16 @@ void SNMPrequest(char* address){
 	ZeroMemory(&serveraddr, sizeof(serveraddr));
 	serveraddr.sin_family = AF_INET;
 	serveraddr.sin_port = htons(9000);
-	serveraddr.sin_addr.s_addr = inet_addr(address);
+	serveraddr.sin_addr.s_addr = inet_addr((const char*)address);
 
 	// connect()
 	retval = connect(sock, (SOCKADDR *)&serveraddr, sizeof(serveraddr));
 	if(retval == SOCKET_ERROR) err_quit("connect()");
 		
 	// 서버와 데이터 통신
-
 	ZeroMemory(buf, sizeof(buf));
 
-	printf("\nseveraddr: %s Request ");
+	printf("\n severaddr: %s Request \n", address);
 		
 	strcpy(buf,"request");
 
@@ -84,17 +95,17 @@ void SNMPrequest(char* address){
 	retval = send(sock, buf, strlen(buf), 0);
 	if(retval == SOCKET_ERROR){
 		err_display("send()");
-		return;
+		return 0;
 	}
 
 	// 데이터 받기
 	retval = recv(sock, buf, BUFSIZE, 0);
 	if(retval == SOCKET_ERROR){
 		err_display("recv()");
-		return;
+		return 0;
 	}
 	else if(retval == 0)
-		return;
+		return 0;
 		
 	// 받은 데이터 출력
 	buf[retval] = '\0';

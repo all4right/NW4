@@ -18,6 +18,8 @@
 #include <winsock.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <string.h>
 
 #pragma warning(disable:4996)
 
@@ -249,7 +251,7 @@ int main()
             response->trans_udp_count = trans_udp_count;
 
             //response 보내기
-            buf = (char*)response;
+            strcpy(buf,(char*)response);
             retval = send(client_sock, buf, sizeof(response), 0); 
             
             pcap_freealldevs(alldevs);
@@ -330,8 +332,6 @@ void get_stat(u_char* user, const struct pcap_pkthdr* h,    const u_char* p)
 
     if (tot_capured_pk_num++ > MAX_CAP_PKT) {
         printf("\n\n %d-packets were captured ...\n", tot_capured_pk_num);
-
-        response;
 
         // close all devices and files
         pcap_close(adhandle);
