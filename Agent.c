@@ -215,6 +215,8 @@ int main()
                 return -1;
             }
 
+            d = alldevs;
+
             for(devNum = 0; devNum < ndNum; devNum++){
                 /* Open the adapter */
                 if ((adhandle = pcap_open_live( d->name, // name of the device
@@ -231,13 +233,12 @@ int main()
                     return -1;
                 }
 
-                printf("\n Selected device %s is available\n\n", d->description);
-
                 pcap_loop(adhandle, 	// capture device handler
                         -1, 	   	// forever
                         get_stat,   // callback function
                         NULL);      // no arguments
 
+                printf("%d\n",devNum);
                 // device 넘기기
                 d = d->next;
             }
@@ -303,6 +304,8 @@ void get_stat(u_char* user, const struct pcap_pkthdr* h,    const u_char* p)
     struct tm* ltime;
     char timestr[16];
     unsigned short type;
+
+    printf("get stat\n");
 
     // convert the timestamp to readable format
     ltime = localtime(&h->ts.tv_sec);
