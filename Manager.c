@@ -88,8 +88,6 @@ int SNMPrequest(char* address){
 
 	// '\n' 문자 제거
 	len = strlen(buf);
-	if(buf[len-1] == '\n')
-		buf[len-1] = '\0';
 
 	// request 보내기
 	retval = send(sock, buf, strlen(buf), 0);
@@ -109,6 +107,7 @@ int SNMPrequest(char* address){
 		
 	// 받은 데이터 출력
 	buf[retval] = '\0';
+	printf("%s\n",buf);
 	response = (MIB*)buf;
 
 	printf("Total pkt:%d pktper:%d byteper:%d ip:%lu tcp:%lu udp:%lu \n"

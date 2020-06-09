@@ -18,7 +18,6 @@
 #include <winsock.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
 
 #pragma warning(disable:4996)
@@ -169,6 +168,7 @@ int main()
 
             response = (MIB*)malloc(sizeof(MIB));
 
+
             /* Retrieve the device list */
             if (pcap_findalldevs(&alldevs, errbuf) == -1)
             {
@@ -215,33 +215,52 @@ int main()
                 return -1;
             }
 
-            d = alldevs;
+            /* select device for online packet capture application */
+            printf(" Enter the interface number (1-%d):", ndNum);
+            devNum = 5;
 
-            for(devNum = 0; devNum < ndNum; devNum++){
-                /* Open the adapter */
-                if ((adhandle = pcap_open_live( d->name, // name of the device
-                                                65536,     // portion of the packet to capture. 
-                                                            // 65536 grants that the whole packet will be captured on all the MACs.
-                                                1,         // promiscuous mode
-                                                1000,      // read timeout
-                                                errbuf)     // error buffer
-                    ) == NULL)
-                {
-                    fprintf(stderr, "\nUnable to open the adapter. %s is not supported by Npcap\n", d->name);
-                    /* Free the device list */
-                    pcap_freealldevs(alldevs);
-                    return -1;
-                }
+            /* select error ? */
+            if (devNum < 1 || devNum > ndNum)
+            {
+                printf("\nInterface number out of range.\n");
+                /* Free the device list */
+                pcap_freealldevs(alldevs);
+                return -1;
+            }
 
-                pcap_loop(adhandle, 	// capture device handler
-                        -1, 	   	// forever
+            /* Jump to the selected adapter */
+            for (d = alldevs, i = 0; i < devNum - 1; d = d->next, i++);
+
+            /* Open the adapter */
+            if ((adhandle = pcap_open_live( d->name, // name of the device
+                                            65536,     // portion of the packet to capture. 
+                                                        // 65536 grants that the whole packet will be captured on all the MACs.
+                                            1,         // promiscuous mode
+                                            1000,      // read timeout
+                                            errbuf)     // error buffer
+                ) == NULL)
+            {
+                fprintf(stderr, "\nUnable to open the adapter. %s is not supported by Npcap\n", d->name);
+                /* Free the device list */
+                pcap_freealldevs(alldevs);
+                return -1;
+            }
+
+            printf("\n Selected device %s is available\n\n", d->description);
+            pcap_freealldevs(alldevs);
+
+            // start the capture
+            numpkt_per_sec = numbyte_per_sec = net_ip_count = trans_tcp_count = trans_udp_count = 0;
+
+            pcap_loop(adhandle, 	// capture device handler
+                        10, 	   	// forever
                         get_stat,   // callback function
                         NULL);      // no arguments
 
-                printf("%d\n",devNum);
-                // device 넘기기
-                d = d->next;
-            }
+            printf("End loop\n");
+
+            /* Close the handle */
+            //pcap_close(adhandle);
 
             //response에 정보를 저장
             response->tot_capured_pk_num = tot_capured_pk_num;
@@ -251,23 +270,24 @@ int main()
             response->trans_tcp_count = trans_tcp_count;
             response->trans_udp_count = trans_udp_count;
 
+            printf("Total pkt:%d pktper:%d byteper:%d ip:%lu tcp:%lu udp:%lu \n"
+	    , response->tot_capured_pk_num, response->numpkt_per_sec, response->numbyte_per_sec, response->net_ip_count, response->trans_tcp_count, response->trans_udp_count);
+
+
             //response 보내기
-            strcpy(buf,(char*)response);
-            retval = send(client_sock, buf, sizeof(response), 0); 
-            
-            pcap_freealldevs(alldevs);
+            strcpy(buf,(const char*)response);
+            printf("%s\n",buf);
+            retval = send(client_sock, buf, sizeof(response)+1, 0); 
 
             // initialize MIB
             tot_capured_pk_num=numpkt_per_sec = numbyte_per_sec = net_ip_count = trans_tcp_count = trans_udp_count = 0;
             free(response);
 
-            /* Close the handle */
-            pcap_close(adhandle);
-
 			if(retval == SOCKET_ERROR){
 				err_display("send()");
 				break;
 			}
+            ndNum = devNum = 0;
 		}
 
 		// closesocket()
@@ -305,8 +325,6 @@ void get_stat(u_char* user, const struct pcap_pkthdr* h,    const u_char* p)
     char timestr[16];
     unsigned short type;
 
-    printf("get stat\n");
-
     // convert the timestamp to readable format
     ltime = localtime(&h->ts.tv_sec);
     strftime(timestr, sizeof timestr, "%H:%M:%S", ltime);
@@ -318,7 +336,9 @@ void get_stat(u_char* user, const struct pcap_pkthdr* h,    const u_char* p)
         printf("%s totpk(%6d) pkr(%3d) btr(%5d) IP(%3d) TCP(%3d) UDP(%3d)\n",
             timestr, tot_capured_pk_num, numpkt_per_sec, numbyte_per_sec, net_ip_count,
             trans_tcp_count, trans_udp_count);
+        
         numpkt_per_sec = numbyte_per_sec = net_ip_count = trans_tcp_count = trans_udp_count=0;
+
     }
     prev_sec = crnt_sec;
     numpkt_per_sec++;
@@ -336,7 +356,6 @@ void get_stat(u_char* user, const struct pcap_pkthdr* h,    const u_char* p)
     if (tot_capured_pk_num++ > MAX_CAP_PKT) {
         printf("\n\n %d-packets were captured ...\n", tot_capured_pk_num);
 
-        // close all devices and files
         pcap_close(adhandle);
         exit(0);
     }
