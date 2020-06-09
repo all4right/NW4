@@ -21,6 +21,8 @@
 
 #pragma warning(disable:4996)
 
+#define BUFSIZE 1500
+
 #define LINE_LEN 16
 
  // litereals realted to distinguishing protocols
@@ -56,6 +58,27 @@ unsigned long	trans_etc_count;
                     (unsigned short)*((unsigned char *)(p)+3)<<0)
 
 char*   iptos(u_long in);
+
+// call back function
+void    get_stat(u_char* user, const struct pcap_pkthdr* h, const u_char* p);
+
+int	    numpkt_per_sec, numbyte_per_sec;	// packet and byte rates per second
+int	    tot_capured_pk_num = 0;		        // total number of captured packets
+long	crnt_sec, prev_sec;		            // time references in second
+pcap_t* adhandle;                           // globally defined for callback fucntion
+
+// 소켓 함수 오류 출력 후 종료
+void err_quit(char *msg)
+{
+	printf("Error [%s] ... program terminated \n",msg);
+	exit(-1);
+}
+
+// 소켓 함수 오류 출력
+void err_display(char *msg)
+{
+	printf("socket function error [%s]\n", msg);
+}
 
 int main()
 {
