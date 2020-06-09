@@ -250,7 +250,7 @@ int main()
 
             //response 보내기
             buf = (char*)response;
-            retval = send(client_sock, buf, strlen(response), 0); 
+            retval = send(client_sock, buf, sizeof(response), 0); 
             
             pcap_freealldevs(alldevs);
 
